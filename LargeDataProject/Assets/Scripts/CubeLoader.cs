@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 public class CubeLoader : MonoBehaviour
 {
-    public string apiUrl = "http://127.0.0.1:8000/api/cubes";
+    public string apiUrl = Var.CubeApiUrl;
     public Material baseMaterial;
     public Vector3 cubeSize = Vector3.one;
 
@@ -22,9 +22,6 @@ public class CubeLoader : MonoBehaviour
     {
         cubeMesh = CreateCubeMesh(cubeSize);
         StartCoroutine(LoadCubeData());
-        //CreateClickPlane(); // 클릭용 바닥 자동 생성
-        //CreateCutPlane_X();
-
     }
 
     IEnumerator LoadCubeData()
@@ -72,14 +69,7 @@ public class CubeLoader : MonoBehaviour
 
                 if (parts.Length > 1 && int.TryParse(parts[1], out int colorCode))
                 {
-                    switch (colorCode)
-                    {
-                        case 1: colorToUse = Color.red; break;
-                        case 2: colorToUse = Color.green; break;
-                        case 3: colorToUse = Color.white; break;
-                        case 4: colorToUse = Color.yellow; break;
-                        case 5: colorToUse = Color.blue; break;
-                    }
+                    colorToUse=Var.ColorMap[colorCode];
                 }
 
                 props.SetColor("_BaseColor", colorToUse);
@@ -141,7 +131,7 @@ public class CubeLoader : MonoBehaviour
 
     IEnumerator GetCubeDetail(int seq)
     {
-        string url = $"http://127.0.0.1:8001/api/cube?seq={seq}";
+        string url = Var.CubeDetailUrl(seq);
         using (UnityWebRequest req = UnityWebRequest.Get(url))
         {
             yield return req.SendWebRequest();
