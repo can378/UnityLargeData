@@ -11,10 +11,10 @@ public class CubeLoader : MonoBehaviour
 
     private Mesh cubeMesh;
     private List<Matrix4x4[]> matrixBatches = new List<Matrix4x4[]>();
-    private List<MaterialPropertyBlock[]> propertyBatches = new List<MaterialPropertyBlock[]>();
-    private const int batchSize = 1023;
+    public List<MaterialPropertyBlock[]> propertyBatches = new List<MaterialPropertyBlock[]>();
+    public int batchSize = 1023;
 
-    private CubeData[] cubes;
+    public CubeData[] cubes;
 
     void Start()
     {
@@ -151,7 +151,6 @@ public class CubeLoader : MonoBehaviour
         {
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
 
-            Debug.Log("click");
             if (Physics.Raycast(ray, out RaycastHit hit))
             {
                 CubeIndex meta = hit.collider.GetComponent<CubeIndex>();
