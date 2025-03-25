@@ -49,7 +49,7 @@ public class CubeLoader : MonoBehaviour
             //test로 출력
             for (int i = 0; i < Mathf.Min(10, cubes.Length); i++)
             {
-                Debug.Log($"[Cube {i}] seq: {cubes[i].seq}, {cubes[i].Column1}, {cubes[i].Column2}, column5: {cubes[i].Column5}");
+                Debug.Log($"[Cube {i}] seq: {cubes[i].seq}, {cubes[i].column1}, {cubes[i].column2}, column5: {cubes[i].column5}");
                 
             }
             Debug.Log("원본 JSON 응답: " + req.downloadHandler.text);
@@ -75,7 +75,9 @@ public class CubeLoader : MonoBehaviour
                 // 색상 처리!!!!!!!!!!!!!!!!!!!!!!!
                 MaterialPropertyBlock props = new MaterialPropertyBlock();
 
-                string[] parts = cubes[i].Column5.Split('&');
+
+                Debug.Log("test="+cubes[i].column5);
+                string[] parts = cubes[i].column5.Split('&');
                 Color colorToUse = Color.gray;
 
                 if (parts.Length > 1 && int.TryParse(parts[1], out int colorCode))
@@ -92,7 +94,7 @@ public class CubeLoader : MonoBehaviour
                 }
                 else
                 {
-                    Debug.LogWarning($"색상코드 얻기기 실패: {cubes[i].Column5}");
+                    Debug.LogWarning($"색상코드 얻기기 실패: {cubes[i].column5}");
                 }
 
                 props.SetColor("_BaseColor", colorToUse);

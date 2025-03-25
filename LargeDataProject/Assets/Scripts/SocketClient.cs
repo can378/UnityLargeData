@@ -21,7 +21,8 @@ public class SocketManager : MonoBehaviour
         client.On("cube_updated", response =>
         {
             CubeData updatedCube = response.GetValue<CubeData>();
-            Debug.Log("수정된 것="+updatedCube);
+            Debug.Log("수정 "+updatedCube.seq+"="+updatedCube.column5);
+
 
             for (int i = 0; i < cubeLoader.cubes.Length; i++)
             {
@@ -30,7 +31,7 @@ public class SocketManager : MonoBehaviour
                     cubeLoader.cubes[i] = updatedCube;
 
                     // 색상 다시 설정
-                    string[] parts = updatedCube.Column5.Split('&');
+                    string[] parts = updatedCube.column5.Split('&');
                     Color colorToUse = Color.gray;
 
                     if (parts.Length > 1 && int.TryParse(parts[1], out int colorCode))
