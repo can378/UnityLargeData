@@ -121,7 +121,7 @@ public class CubeLoader : MonoBehaviour
                 if (meta != null)
                 {
                     int seq = meta.seq;
-                    Debug.Log($"■ 클릭 큐브 seq: {seq}");
+                    //Debug.Log($"■ 클릭 큐브 seq: {seq}");
                     StartCoroutine(GetCubeDetail(seq));
                 }
             }
@@ -142,7 +142,7 @@ public class CubeLoader : MonoBehaviour
             }
             else
             {
-                Debug.Log($"Cube {seq}: " + req.downloadHandler.text);
+                Debug.Log($"■ click Cube {seq}: " + req.downloadHandler.text);
             }
         }
     }

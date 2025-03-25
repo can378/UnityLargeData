@@ -4,7 +4,7 @@ import duckdb
 import mysql.connector
 import pandas as pd
 from fastapi import APIRouter, Query, HTTPException
-from models.cube import Cube
+from app.models.cube import Cube
 from dotenv import load_dotenv
 from socketio import AsyncServer
 
@@ -15,13 +15,23 @@ router = APIRouter()
 con = duckdb.connect(database=':memory:')
 
 def load_data_from_mariadb():
+    # conn = mysql.connector.connect(
+    #     host=os.getenv("METANET_DB_HOST"),
+    #     port=int(os.getenv("METANET_DB_PORT")),
+    #     user=os.getenv("METANET_DB_USERNAME"),
+    #     password=os.getenv("METANET_DB_PSW"),
+    #     database=os.getenv("METANET_DB_NAME")
+    # )
+
+    
     conn = mysql.connector.connect(
-        host=os.getenv("METANET_DB_HOST"),
-        port=int(os.getenv("METANET_DB_PORT")),
-        user=os.getenv("METANET_DB_USERNAME"),
-        password=os.getenv("METANET_DB_PSW"),
-        database=os.getenv("METANET_DB_NAME")
+        host='127.0.0.1',
+        port=3305,
+        user='test',
+        password='test',
+        database='test'
     )
+
     cursor = conn.cursor(dictionary=True)
     cursor.execute("SELECT * FROM largedata")
     rows = cursor.fetchall()
@@ -41,7 +51,7 @@ def init_routes(socket_io: AsyncServer):
 
 @router.get("/api/cubes")
 def get_cubes():
-    result = con.execute("SELECT seq, column5 FROM largedata limit 1000").fetchdf()
+    result = con.execute("SELECT seq, column5 FROM largedata").fetchdf()
     return result.to_dict(orient="records")
 
 @router.get("/api/cube")

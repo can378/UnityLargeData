@@ -2,7 +2,7 @@
 import socketio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routes import cube_routes
+from app.routes import cube_routes
 
 # Load .env
 from dotenv import load_dotenv
