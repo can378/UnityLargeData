@@ -4,7 +4,10 @@ from fastapi.middleware.cors import CORSMiddleware
 import duckdb
 import pandas as pd
 import mysql.connector
+from dotenv import load_dotenv
+import os
 
+load_dotenv()
 app = FastAPI()
 
 # CORS 설정 (Unity에서 요청 허용)
@@ -19,13 +22,19 @@ app.add_middleware(
 con = duckdb.connect(database=':memory:')
 
 def load_data_from_mariadb():
-    conn = mysql.connector.connect(
-        host="localhost",
-        port=3305,
-        user="test",
-        password="test",
-        database="test"
-    )
+    print("Loaded DB username:", os.getenv("METANET_DB_USERNAME"))
+
+    try:
+        conn = mysql.connector.connect(
+            host=os.getenv("METANET_DB_HOST"),
+            port=int(os.getenv("METANET_DB_PORT")),
+            user=os.getenv("METANET_DB_USERNAME"),
+            password=os.getenv("METANET_DB_PSW"),
+            database=os.getenv("METANET_DB_NAME")
+        )
+    except KeyError as e:
+        raise RuntimeError(f"환경변수 에러: {e}")
+
 
     cursor = conn.cursor(dictionary=True)
     cursor.execute("SELECT * FROM largedata")
