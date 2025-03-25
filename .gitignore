@@ -21,3 +21,4 @@ MemoryCaptures/
 .DS_Store
 Thumbs.db
 .collabignore
+__pycache__
