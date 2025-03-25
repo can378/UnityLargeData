@@ -9,6 +9,8 @@ public class CubeLoader : MonoBehaviour
     public Material baseMaterial;
     public Vector3 cubeSize = Vector3.one;
 
+    public Dictionary<int, int> cubeSeqToIndexMap = new Dictionary<int, int>();
+
     private Mesh cubeMesh;
     private List<Matrix4x4[]> matrixBatches = new List<Matrix4x4[]>();
     public List<MaterialPropertyBlock[]> propertyBatches = new List<MaterialPropertyBlock[]>();
@@ -38,33 +40,24 @@ public class CubeLoader : MonoBehaviour
                 yield break;
             }
 
-            // JSON 배열을 감싸서 JsonUtility가 읽을 수 있게 함
             string json = "{\"cubes\":" + req.downloadHandler.text + "}";
 
             CubeWrapper wrapper = JsonUtility.FromJson<CubeWrapper>(json);
             cubes = wrapper.cubes;
-            
-            
-            //Debug.Log("cube개수="+cubes.Length);
-            //test로 출력
-            for (int i = 0; i < Mathf.Min(10, cubes.Length); i++)
-            {
-                Debug.Log($"[Cube {i}] seq: {cubes[i].seq}, {cubes[i].column1}, {cubes[i].column2}, column5: {cubes[i].column5}");
-                
-            }
-            Debug.Log("원본 JSON 응답: " + req.downloadHandler.text);
 
+            cubeSeqToIndexMap.Clear();  // 딕셔너리 초기화
 
             int index = 0;
             for (int i = 0; i < cubes.Length; i++)
             {
+                cubeSeqToIndexMap[cubes[i].seq] = i;  // seq를 index로 매핑
+                
                 if (index % batchSize == 0)
                 {
                     matrixBatches.Add(new Matrix4x4[Mathf.Min(batchSize, cubes.Length - index)]);
                     propertyBatches.Add(new MaterialPropertyBlock[Mathf.Min(batchSize, cubes.Length - index)]);
                 }
 
-                // 위치 설정정
                 int x = index % 100;
                 int y = (index / 100) % 100;
                 int z = index / (100 * 100);
@@ -72,11 +65,8 @@ public class CubeLoader : MonoBehaviour
                 Vector3 pos = new Vector3(x * 1.2f, y * 1.2f, z * 1.2f);
                 matrixBatches[index / batchSize][index % batchSize] = Matrix4x4.TRS(pos, Quaternion.identity, Vector3.one);
 
-                // 색상 처리!!!!!!!!!!!!!!!!!!!!!!!
                 MaterialPropertyBlock props = new MaterialPropertyBlock();
 
-
-                Debug.Log("test="+cubes[i].column5);
                 string[] parts = cubes[i].column5.Split('&');
                 Color colorToUse = Color.gray;
 
@@ -89,12 +79,7 @@ public class CubeLoader : MonoBehaviour
                         case 3: colorToUse = Color.white; break;
                         case 4: colorToUse = Color.yellow; break;
                         case 5: colorToUse = Color.blue; break;
-                        default: colorToUse = Color.gray; break;
                     }
-                }
-                else
-                {
-                    Debug.LogWarning($"색상코드 얻기기 실패: {cubes[i].column5}");
                 }
 
                 props.SetColor("_BaseColor", colorToUse);
@@ -102,29 +87,16 @@ public class CubeLoader : MonoBehaviour
 
                 GameObject colliderCube = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 colliderCube.transform.position = pos;
-                colliderCube.transform.localScale = Vector3.one * 1.2f; // spacing 고려
+                colliderCube.transform.localScale = Vector3.one * 1.2f;
 
-                // 렌더러 비활성화해서 안 보이게
                 colliderCube.GetComponent<MeshRenderer>().enabled = false;
 
-                // CubeMeta 스크립트에 seq 정보 저장 
                 CubeIndex meta = colliderCube.AddComponent<CubeIndex>();
-                if (meta == null)
-                {
-                    Debug.LogError("CubeIndex AddComponent 실패!");
-                }
-                else
-                {
-                    meta.seq = cubes[i].seq;
-                }
-
+                meta.seq = cubes[i].seq;
 
                 index++;
             }
         }
-
-        
-
     }
 
 
