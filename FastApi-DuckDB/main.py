@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi import Query
 from fastapi.middleware.cors import CORSMiddleware
 import duckdb
 import pandas as pd
@@ -27,7 +28,7 @@ def load_data_from_mariadb():
     )
 
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT seq, column5 FROM largedata LIMIT 100000")
+    cursor.execute("SELECT * FROM largedata")
     rows = cursor.fetchall()
     df = pd.DataFrame(rows)
     con.execute("CREATE OR REPLACE TABLE largedata AS SELECT * FROM df")
@@ -38,5 +39,13 @@ load_data_from_mariadb()
 
 @app.get("/api/cubes")
 def get_cubes():
-    result = con.execute("SELECT seq, column5 FROM largedata limit 1000").fetchdf()
+    result = con.execute("SELECT seq, column5 FROM largedata").fetchdf()
     return result.to_dict(orient="records")
+
+
+@app.get("/api/cube")
+def get_one_cube(seq: int = Query(..., description="조회할 cube의 seq 값")):
+    result = con.execute("SELECT * FROM largedata WHERE seq = ?", (seq,)).fetchdf()
+    if result.empty:
+        return {"message": f"Cube with seq={seq} not found."}
+    return result.to_dict(orient="records")[0]  # 단일 row만 반환
