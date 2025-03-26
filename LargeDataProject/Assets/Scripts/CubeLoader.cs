@@ -19,25 +19,41 @@ public class CubeLoader : MonoBehaviour
 
     public CubeData[] cubes;
     public List<CubeData> cubes2 = new List<CubeData>();
+    private bool renderReady = false;
 
     //public string csvUrl = "http://localhost:8001/api/cubes_csv";
     public string csvUrl3 = "http://127.0.0.1:8001/api/cubes_csv";
 
+
+    private float renderStartTime = 0f;
+
+    // MaterialPropertyBlock 리스트 추가
+    private List<MaterialPropertyBlock> propertyBlocks = new List<MaterialPropertyBlock>();
     void Start()
     {
         Debug.Log(csvUrl3);
         baseMaterial.enableInstancing = true;
         cubeMesh = CreateCubeMesh(cubeSize);
+        renderStartTime = Time.realtimeSinceStartup; // ⏱️ 시작 시간 기록
         StartCoroutine(LoadCubesFromCustom());
     }
+
 
     IEnumerator LoadCubesFromCustom()
     {
         string url = "http://127.0.0.1:8001/api/cubes_custom";
+
+        float networkStartTime = Time.realtimeSinceStartup;
+        
         UnityWebRequest req = UnityWebRequest.Get(url);
         req.downloadHandler = new DownloadHandlerBuffer();
         yield return req.SendWebRequest();
 
+
+        float networkEndTime = Time.realtimeSinceStartup;
+        float downloadDuration = networkEndTime - networkStartTime;
+        Debug.Log($"🌐 데이터 다운로드 시간: {downloadDuration:F2}초");
+        
         if (req.result != UnityWebRequest.Result.Success)
         {
             Debug.LogError("❌ Custom 포맷 다운로드 실패: " + req.error);
@@ -114,6 +130,7 @@ public class CubeLoader : MonoBehaviour
     {
         matrixBatches.Clear();
         colorBatches.Clear();
+        propertyBlocks.Clear();
 
         for (int index = 0; index < cubes2.Count; index++)
         {
@@ -139,27 +156,44 @@ public class CubeLoader : MonoBehaviour
                 yield return null;
         }
 
-        cubes = cubes2.ToArray(); // 배열로 복사 (색상 업데이트 호환 위해)
-    }
-
-    void Update()
-    {
-        for (int i = 0; i < matrixBatches.Count; i++)
+        // 🧱 MaterialPropertyBlock 재사용 리스트 생성
+        int batchCount = matrixBatches.Count;
+        for (int i = 0; i < batchCount; i++)
         {
             MaterialPropertyBlock props = new MaterialPropertyBlock();
             props.SetVectorArray("_BaseColor", colorBatches[i]);
+            propertyBlocks.Add(props);
+        }
 
+        cubes = cubes2.ToArray(); // 배열로 복사
+
+        // ⏱️ 렌더 준비 시간 측정 종료
+        float elapsed = Time.realtimeSinceStartup - renderStartTime;
+        Debug.Log($"⏱ 렌더 준비 완료! 걸린 시간: {elapsed:F2}초");
+
+        renderReady = true;
+
+    }
+
+
+    void Update()
+    {
+        if (!renderReady) return;
+
+        for (int i = 0; i < matrixBatches.Count; i++)
+        {
+            if (i >= propertyBlocks.Count)
+            {
+                Debug.LogWarning($"⚠️ propertyBlocks 부족! index={i}, count={propertyBlocks.Count}");
+                continue;
+            }
             Graphics.DrawMeshInstanced(
                 cubeMesh,
                 0,
                 baseMaterial,
                 matrixBatches[i],
                 matrixBatches[i].Length,
-                props,
-                UnityEngine.Rendering.ShadowCastingMode.Off,
-                false,
-                0,
-                null
+                propertyBlocks[i]
             );
         }
 
@@ -177,6 +211,7 @@ public class CubeLoader : MonoBehaviour
             }
         }
     }
+
 
     public void UpdateCubeColor(string objectId, int newStatus)
     {
