@@ -7,6 +7,8 @@ public class Var : MonoBehaviour
     public static string CubeApiUrl = BaseUrl + "/api/cubes";
     public static string CubeDetailUrl(string object_id) => $"{BaseUrl}/api/cube?object_id={object_id}";
 
+    public static string CsvApiUrl="http://127.0.0.1:8001/api/cubes_custom";
+    
 
     //color
     public static readonly Dictionary<int, Color> ColorMap = new Dictionary<int, Color>
