@@ -172,7 +172,7 @@ def get_cubes_custom():
             remark,
             cur_qty
         FROM {TABLE_NAME}
-
+        LIMIT 100000
     """
     df = con.execute(query).fetchdf()
     lines = df.apply(lambda row: "&".join([str(v) for v in row]), axis=1)

@@ -6,7 +6,6 @@ using System;
 
 public class CubeLoader : MonoBehaviour
 {
-    public string apiUrl = Var.CubeApiUrl;
     public Material baseMaterial;
     public Vector3 cubeSize = Vector3.one;
 
@@ -21,31 +20,29 @@ public class CubeLoader : MonoBehaviour
     public List<CubeData> cubes2 = new List<CubeData>();
     private bool renderReady = false;
 
-    //public string csvUrl = "http://localhost:8001/api/cubes_csv";
-    public string csvUrl3 = "http://127.0.0.1:8001/api/cubes_csv";
-
-
     private float renderStartTime = 0f;
 
-    // MaterialPropertyBlock 리스트 추가
     private List<MaterialPropertyBlock> propertyBlocks = new List<MaterialPropertyBlock>();
+    
     void Start()
     {
-        Debug.Log(csvUrl3);
         baseMaterial.enableInstancing = true;
+        
+        //create cube mesh
         cubeMesh = CreateCubeMesh(cubeSize);
-        renderStartTime = Time.realtimeSinceStartup; //시작 시간 기록
+        
+        renderStartTime = Time.realtimeSinceStartup; //시간 기록 시작
+
+        //Load cube!
         StartCoroutine(LoadCubesFromCustom());
     }
 
 
     IEnumerator LoadCubesFromCustom()
     {
-        string url = "http://127.0.0.1:8001/api/cubes_custom";
-
         float networkStartTime = Time.realtimeSinceStartup;
 
-        UnityWebRequest req = UnityWebRequest.Get(url);
+        UnityWebRequest req = UnityWebRequest.Get(Var.CsvApiUrl);
         req.downloadHandler = new DownloadHandlerBuffer();
         yield return req.SendWebRequest();
 
