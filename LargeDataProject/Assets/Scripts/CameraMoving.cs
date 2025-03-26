@@ -4,7 +4,7 @@ public class CameraMoving : MonoBehaviour
 {
     public float moveSpeed = 10.0f;          // 카메라 이동 속도
     public float verticalSpeed = 5.0f;       // 위아래 이동 속도
-    public float mouseSensitivity = 2.0f;    // 마우스 감도
+    public float mouseSensitivity = 10.0f;    // 마우스 감도
 
     private float rotationX = 0f;
     private float rotationY = 0f;

@@ -18,6 +18,11 @@ public class CubeLoader : MonoBehaviour
 
     public CubeData[] cubes;
 
+
+
+    
+    
+
     void Start()
     {
         cubeMesh = CreateCubeMesh(cubeSize);
@@ -90,25 +95,49 @@ public class CubeLoader : MonoBehaviour
     }
 
 
-
+    
     void Update()
     {
+        MaterialPropertyBlock props = new MaterialPropertyBlock();
+        
+
         // DrawMesh 그대로 유지
         for (int i = 0; i < matrixBatches.Count; i++)
         {
-            for (int j = 0; j < matrixBatches[i].Length; j++)
+            int batchLength = matrixBatches[i].Length;
+            Vector4[] colors = new Vector4[batchLength];
+
+            // 인스턴스 컬러 배열 설정
+            for (int j = 0; j < batchLength; j++)
             {
-                Graphics.DrawMesh(
-                    cubeMesh,
-                    matrixBatches[i][j],
-                    baseMaterial,
-                    0,
-                    null,
-                    0,
-                    propertyBatches[i][j]
-                );
+                string[] parts = cubes[i * batchSize + j].column5.Split('&');
+                Color colorToUse = Color.gray;
+
+                if (parts.Length > 1 && int.TryParse(parts[1], out int colorCode))
+                {
+                    colorToUse = Var.ColorMap[colorCode];
+                }
+
+                colors[j] = colorToUse;
             }
+
+            props.Clear();
+            props.SetVectorArray("_BaseColor", colors);
+
+            Graphics.DrawMeshInstanced(
+                cubeMesh,
+                0,
+                baseMaterial,  // 커스텀 셰이더를 사용하는 Material
+                matrixBatches[i],
+                batchLength,
+                props, // 배열 형태로 한 번에 전달
+                UnityEngine.Rendering.ShadowCastingMode.Off,
+                false,
+                0,
+                null
+            );
         }
+
 
         // 마우스 클릭 처리
         if (Input.GetMouseButtonDown(0))
