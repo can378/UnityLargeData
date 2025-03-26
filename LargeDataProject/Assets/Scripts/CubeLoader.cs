@@ -34,7 +34,7 @@ public class CubeLoader : MonoBehaviour
         Debug.Log(csvUrl3);
         baseMaterial.enableInstancing = true;
         cubeMesh = CreateCubeMesh(cubeSize);
-        renderStartTime = Time.realtimeSinceStartup; // ⏱️ 시작 시간 기록
+        renderStartTime = Time.realtimeSinceStartup; //시작 시간 기록
         StartCoroutine(LoadCubesFromCustom());
     }
 
@@ -52,18 +52,18 @@ public class CubeLoader : MonoBehaviour
 
         float networkEndTime = Time.realtimeSinceStartup;
         float downloadDuration = networkEndTime - networkStartTime;
-        Debug.Log($"🌐 데이터 다운로드 시간: {downloadDuration:F2}초");
+        Debug.Log($"⌛ 데이터 다운로드: {downloadDuration:F2}초");
         
         if (req.result != UnityWebRequest.Result.Success)
         {
-            Debug.LogError("❌ Custom 포맷 다운로드 실패: " + req.error);
+            Debug.LogError("💢 csv 다운로드 실패: " + req.error);
             yield break;
         }
 
-        Debug.Log("✅ Custom 포맷 수신 성공");
+        Debug.Log("csv로 수신 성공");
 
-        Debug.Log(req.GetResponseHeader("Content-Encoding"));  //gzip?
-        Debug.Log("응답 길이: " + req.downloadHandler.text.Length); // 실제 텍스트 길이
+        //Debug.Log(req.GetResponseHeader("Content-Encoding"));  //gzip?
+        //Debug.Log("실제 첵스트 길이: " + req.downloadHandler.text.Length);
 
         ParseCustomFormat(req.downloadHandler.text);
     }
@@ -76,7 +76,7 @@ public class CubeLoader : MonoBehaviour
             string[] fields = line.Split('&');
             if (fields.Length != 6)
             {
-                Debug.LogWarning("⚠️ 필드 수 불일치: " + line);
+                Debug.LogWarning("필드 수 불일치: " + line);
                 continue;
             }
 
@@ -94,7 +94,7 @@ public class CubeLoader : MonoBehaviour
             cubeSeqToIndexMap[cube.object_id] = cubes2.Count - 1;
         }
 
-        Debug.Log($"✅ {cubes2.Count}개 큐브 로딩 완료 (커스텀)");
+        Debug.Log($"{cubes2.Count}개 큐브 로딩 완료");
         StartCoroutine(RenderCubesCoroutine());
     }
 
@@ -127,7 +127,7 @@ public class CubeLoader : MonoBehaviour
             cubeSeqToIndexMap[cube.object_id] = cubes2.Count - 1;
         }
 
-        Debug.Log($"✅ {cubes2.Count}개 큐브 로딩 완료 (CSV)");
+        Debug.Log($"{cubes2.Count}개 큐브 로딩 완료 (CSV)");
     }
 
     IEnumerator RenderCubesCoroutine()
@@ -160,7 +160,7 @@ public class CubeLoader : MonoBehaviour
                 yield return null;
         }
 
-        // 🧱 MaterialPropertyBlock 재사용 리스트 생성
+        // MaterialPropertyBlock 재사용 리스트 생성
         int batchCount = matrixBatches.Count;
         for (int i = 0; i < batchCount; i++)
         {
@@ -171,9 +171,9 @@ public class CubeLoader : MonoBehaviour
 
         cubes = cubes2.ToArray(); // 배열로 복사
 
-        // ⏱️ 렌더 준비 시간 측정 종료
+        // 렌더 준비 시간 측정 종료
         float elapsed = Time.realtimeSinceStartup - renderStartTime;
-        Debug.Log($"⏱ 렌더 준비 완료! 걸린 시간: {elapsed:F2}초");
+        Debug.Log($"⌛ 렌더 준비 시간: {elapsed:F2}초");
 
         renderReady = true;
 
@@ -188,7 +188,7 @@ public class CubeLoader : MonoBehaviour
         {
             if (i >= propertyBlocks.Count)
             {
-                Debug.LogWarning($"⚠️ propertyBlocks 부족! index={i}, count={propertyBlocks.Count}");
+                Debug.LogWarning($"propertyBlocks 부족! index={i}, count={propertyBlocks.Count}");
                 continue;
             }
             Graphics.DrawMeshInstanced(
