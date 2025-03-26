@@ -9,7 +9,7 @@ public class CubeLoader : MonoBehaviour
     public Material baseMaterial;
     public Vector3 cubeSize = Vector3.one;
 
-    public Dictionary<int, int> cubeSeqToIndexMap = new Dictionary<int, int>();
+    public Dictionary<string, int> cubeSeqToIndexMap = new Dictionary<string, int>();
 
     private Mesh cubeMesh;
     private List<Matrix4x4[]> matrixBatches = new List<Matrix4x4[]>();
@@ -47,12 +47,12 @@ public class CubeLoader : MonoBehaviour
             CubeWrapper wrapper = JsonUtility.FromJson<CubeWrapper>(json);
             cubes = wrapper.cubes;
 
-            cubeSeqToIndexMap.Clear();  // 딕셔너리 초기화
+            cubeSeqToIndexMap.Clear(); // 딕셔너리 초기화
 
             int index = 0;
             for (int i = 0; i < cubes.Length; i++)
             {
-                cubeSeqToIndexMap[cubes[i].seq] = i;  // seq를 index로 매핑
+                cubeSeqToIndexMap[cubes[i].object_id] = i;  // object_id를 index로 매핑
                 
                 if (index % batchSize == 0)
                 {
@@ -69,14 +69,17 @@ public class CubeLoader : MonoBehaviour
 
                 MaterialPropertyBlock props = new MaterialPropertyBlock();
 
-                string[] parts = cubes[i].column5.Split('&');
-                Color colorToUse = Color.gray;
 
-                if (parts.Length > 1 && int.TryParse(parts[1], out int colorCode))
+                //SET COLOR
+                int nowStatus=cubes[i].now_status;
+                Color colorToUse = Color.gray;
+                if (Var.ColorMap.ContainsKey(nowStatus))
                 {
-                    colorToUse=Var.ColorMap[colorCode];
+                    colorToUse = Var.ColorMap[nowStatus];
                 }
 
+
+                //APPLY COLOR
                 props.SetColor("_BaseColor", colorToUse);
                 propertyBatches[index / batchSize][index % batchSize] = props;
 
@@ -86,8 +89,10 @@ public class CubeLoader : MonoBehaviour
 
                 colliderCube.GetComponent<MeshRenderer>().enabled = false;
 
-                CubeIndex meta = colliderCube.AddComponent<CubeIndex>();
-                meta.seq = cubes[i].seq;
+
+                //??????????????
+                CubeIndex indx = colliderCube.AddComponent<CubeIndex>();
+                indx.object_id = cubes[i].object_id;
 
                 index++;
             }
@@ -110,16 +115,15 @@ public class CubeLoader : MonoBehaviour
             // 인스턴스 컬러 배열 설정
             for (int j = 0; j < batchLength; j++)
             {
-                string[] parts = cubes[i * batchSize + j].column5.Split('&');
+                int nowStatus=cubes[i * batchSize + j].now_status;
                 Color colorToUse = Color.gray;
-
-                if (parts.Length > 1 && int.TryParse(parts[1], out int colorCode))
+                if (Var.ColorMap.ContainsKey(nowStatus))
                 {
-                    colorToUse = Var.ColorMap[colorCode];
+                    colorToUse = Var.ColorMap[nowStatus];
                 }
 
                 colors[j] = colorToUse;
-            }
+            }//?????????????????????
 
             props.Clear();
             props.SetVectorArray("_BaseColor", colors);
@@ -149,18 +153,18 @@ public class CubeLoader : MonoBehaviour
                 CubeIndex meta = hit.collider.GetComponent<CubeIndex>();
                 if (meta != null)
                 {
-                    int seq = meta.seq;
+                    string id = meta.object_id;
                     //Debug.Log($"■ 클릭 큐브 seq: {seq}");
-                    StartCoroutine(GetCubeDetail(seq));
+                    StartCoroutine(GetCubeDetail(id));
                 }
             }
         }
     }
 
 
-    IEnumerator GetCubeDetail(int seq)
+    IEnumerator GetCubeDetail(string id)
     {
-        string url = Var.CubeDetailUrl(seq);
+        string url = Var.CubeDetailUrl(id);
         using (UnityWebRequest req = UnityWebRequest.Get(url))
         {
             yield return req.SendWebRequest();
@@ -171,7 +175,7 @@ public class CubeLoader : MonoBehaviour
             }
             else
             {
-                Debug.Log($"■ click Cube {seq}: " + req.downloadHandler.text);
+                Debug.Log($"■ click Cube {id}: " + req.downloadHandler.text);
             }
         }
     }

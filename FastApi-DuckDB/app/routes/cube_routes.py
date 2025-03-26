@@ -7,40 +7,79 @@ from fastapi import APIRouter, Query, HTTPException
 from app.models.cube import Cube
 from dotenv import load_dotenv
 from socketio import AsyncServer
+import json
+  
+# load_dotenv()
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(BASE_DIR, ".env"), override=True)#환경변수말고 .env를 쓰겠다.
 
-load_dotenv()
+# env_path = os.path.join(BASE_DIR, ".env")
+# if os.path.exists(env_path): 
+#     print(f".env 파일 존재함: {env_path}")
+# else:
+#     print(f".env 파일 없음: {env_path}")
+
+  
+TABLE_NAME = "TB_WEB_RACK_MST_TEST"
+VIEW_NAME="V_WEB_RACK_MST"
+
 
 # 외부에서 socketio 서버 주입 받음
 router = APIRouter()
+#duck_db!!!
 con = duckdb.connect(database=':memory:')
 
-def load_data_from_mariadb():
-    # conn = mysql.connector.connect(
-    #     host=os.getenv("METANET_DB_HOST"),
-    #     port=int(os.getenv("METANET_DB_PORT")),
-    #     user=os.getenv("METANET_DB_USERNAME"),
-    #     password=os.getenv("METANET_DB_PSW"),
-    #     database=os.getenv("METANET_DB_NAME")
-    # )
 
-    
+def create_view():
+    con.execute(f"""
+        CREATE OR REPLACE VIEW {VIEW_NAME} AS
+        SELECT
+            object_id,
+            CASE
+                WHEN DATEDIFF('day',receiving_dt, shipping_dt) <= 5 THEN 1
+                WHEN DATEDIFF('day',receiving_dt, shipping_dt) <= 10 THEN 2
+                ELSE 3
+            END AS now_status,
+            receiving_dt,
+            shipping_dt,
+            remark,
+            cur_qty
+        FROM {TABLE_NAME}
+    """)
+
+
+
+def load_data_from_mariadb():
     conn = mysql.connector.connect(
-        host='127.0.0.1',
-        port=3305,
-        user='test',
-        password='test',
-        database='test'
+        host=os.getenv("METANET_DB_HOST"),
+        port=int(os.getenv("METANET_DB_PORT")),
+        user=os.getenv("METANET_DB_USERNAME"),
+        password=os.getenv("METANET_DB_PSW"),
+        database=os.getenv("METANET_DB_NAME")
     )
 
+ 
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM largedata")
-    rows = cursor.fetchall()
-    df = pd.DataFrame(rows)
-    con.execute("CREATE OR REPLACE TABLE largedata AS SELECT * FROM df")
+    
+    # 테이블 데이터
+    cursor.execute(f"SELECT * FROM {TABLE_NAME}")
+    df_table = pd.DataFrame(cursor.fetchall())
+    con.execute(f"CREATE OR REPLACE TABLE {TABLE_NAME} AS SELECT * FROM df_table")
+
+    # 뷰 결과도 로딩
+    cursor.execute(f"SELECT * FROM {VIEW_NAME}")
+    df_view = pd.DataFrame(cursor.fetchall())
+    create_view()
+
+    #close
     cursor.close()
     conn.close()
 
 load_data_from_mariadb()
+
+
+
+
 
 # 외부에서 sio 주입 예정
 sio: AsyncServer = None
@@ -49,44 +88,85 @@ def init_routes(socket_io: AsyncServer):
     global sio
     sio = socket_io
 
+
+
+
+def get_cube_from_view(object_id: str):
+    result = con.execute(f"""
+        SELECT * FROM {VIEW_NAME} WHERE object_id = ?
+    """, (object_id,)).fetchdf()
+
+    if result.empty:
+        return None
+
+    # 첫 행만 추출
+    cube = result.to_dict(orient="records")[0]
+
+    # datetime → str 변환
+    for key in ["receiving_dt", "shipping_dt"]:
+        if key in cube and hasattr(cube[key], "isoformat"):
+            cube[key] = cube[key].isoformat()
+
+    return cube
+
+
+
+
+
 @router.get("/api/cubes")
 def get_cubes():
-    result = con.execute("SELECT seq, column5 FROM largedata").fetchdf()
+    result = con.execute(f"SELECT * FROM {VIEW_NAME} limit 1000").fetchdf()
     return result.to_dict(orient="records")
 
 @router.get("/api/cube")
-def get_one_cube(seq: int = Query(...)):
-    result = con.execute("SELECT * FROM largedata WHERE seq = ?", (seq,)).fetchdf()
+def get_one_cube(object_id: str = Query(...)):
+    result = con.execute(f"SELECT * FROM {VIEW_NAME} WHERE object_id = ?", (object_id,)).fetchdf()
     if result.empty:
-        return {"message": f"Cube {seq} not found."}
+        return {"message": f"Cube {object_id} not found."}
     return result.to_dict(orient="records")[0]
 
 @router.post("/api/cube")
 async def create_cube(cube: Cube):
-    con.execute("INSERT INTO largedata VALUES (?, ?, ?, ?, ?, ?)", (
-        cube.seq, cube.column1, cube.column2, cube.column3, cube.column4, cube.column5
-    ))
-    await sio.emit("cube_updated", cube.dict())
-    return {"message": "Cube created"}
+    con.execute(f"""
+        INSERT INTO {TABLE_NAME} 
+        (object_id, receiving_dt, shipping_dt, remark, cur_qty) 
+        VALUES (?, ?, ?, ?, ?)
+        """, (cube.object_id, cube.receiving_dt, cube.shipping_dt, cube.remark, cube.cur_qty)
+    )
 
-@router.put("/api/cube/{seq}")
-async def update_cube(seq: int, cube: Cube):
-    result = con.execute("SELECT * FROM largedata WHERE seq = ?", (seq,)).fetchdf()
+    cube_with_status = get_cube_from_view(cube.object_id)
+    await sio.emit("cube_updated", cube_with_status)
+    return {"message": "box created"}
+
+
+@router.put("/api/cube/{object_id}")
+async def update_cube(object_id: str, cube: Cube):
+    result = con.execute(f"SELECT * FROM {TABLE_NAME} WHERE object_id = ?", (object_id,)).fetchdf()
+    
     if result.empty:
         raise HTTPException(status_code=404, detail="Cube not found")
     
-    con.execute("UPDATE largedata SET column1=?, column2=?, column3=?, column4=?, column5=? WHERE seq=?", (
-        cube.column1, cube.column2, cube.column3, cube.column4, cube.column5, seq
+    con.execute(f"UPDATE {TABLE_NAME} SET object_id=?, receiving_dt=?, shipping_dt=?, remark=?, cur_qty=? WHERE object_id=?", (
+        cube.object_id, cube.receiving_dt, cube.shipping_dt, cube.remark, cube.cur_qty, object_id
     ))
-    
-    await sio.emit("cube_updated", cube.dict())
-    return {"message": "Cube updated"}
 
-@router.delete("/api/cube/{seq}")
-async def delete_cube(seq: int):
-    result = con.execute("SELECT * FROM largedata WHERE seq = ?", (seq,)).fetchdf()
-    if result.empty:
-        raise HTTPException(status_code=404, detail="Cube not found")
-    con.execute("DELETE FROM largedata WHERE seq = ?", (seq,))
-    await sio.emit("cube_deleted", {"seq": seq})
+    
+    cube_with_status = get_cube_from_view(cube.object_id)
+    
+    print("cube_with_status type:", type(cube_with_status))
+    print("update data=" + json.dumps(cube_with_status, indent=2))
+    
+    await sio.emit("cube_updated", cube_with_status)
+    return {"message": "box updated"}
+
+
+@router.delete("/api/cube/{object_id}")
+async def delete_cube(object_id: str):
+    con.execute(f"DELETE FROM {TABLE_NAME} WHERE object_id = ?", (object_id,))
+
+    await sio.emit("cube_deleted", {"object_id": object_id})
     return {"message": "Cube deleted"}
+
+
+
+

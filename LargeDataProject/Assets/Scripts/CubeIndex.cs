@@ -2,5 +2,5 @@ using UnityEngine;
 
 public class CubeIndex : MonoBehaviour
 {
-    public int seq;
+    public string object_id;
 }

@@ -5,7 +5,7 @@ public class Var : MonoBehaviour
 {
     public static string BaseUrl = "http://localhost:8001";// FastAPI 서버 주소
     public static string CubeApiUrl = BaseUrl + "/api/cubes";
-    public static string CubeDetailUrl(int seq) => $"{BaseUrl}/api/cube?seq={seq}";
+    public static string CubeDetailUrl(string object_id) => $"{BaseUrl}/api/cube?object_id={object_id}";
 
 
     //color
