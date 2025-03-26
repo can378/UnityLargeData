@@ -13,26 +13,24 @@ public class CubeLoader : MonoBehaviour
 
     private Mesh cubeMesh;
     private List<Matrix4x4[]> matrixBatches = new List<Matrix4x4[]>();
-    public List<MaterialPropertyBlock[]> propertyBatches = new List<MaterialPropertyBlock[]>();
+    public List<Vector4[]> colorBatches = new List<Vector4[]>();
     public int batchSize = 1023;
 
     public CubeData[] cubes;
 
-
-
-    
-    
-
     void Start()
     {
+        baseMaterial.enableInstancing = true;
         cubeMesh = CreateCubeMesh(cubeSize);
         StartCoroutine(LoadCubeData());
     }
 
     IEnumerator LoadCubeData()
     {
+        
         using (UnityWebRequest req = UnityWebRequest.Get(apiUrl))
         {
+            
             req.downloadHandler = new DownloadHandlerBuffer();
             yield return req.SendWebRequest();
 
@@ -43,98 +41,51 @@ public class CubeLoader : MonoBehaviour
             }
 
             string json = "{\"cubes\":" + req.downloadHandler.text + "}";
-
             CubeWrapper wrapper = JsonUtility.FromJson<CubeWrapper>(json);
             cubes = wrapper.cubes;
 
-            cubeSeqToIndexMap.Clear(); // 딕셔너리 초기화
+            cubeSeqToIndexMap.Clear();
 
             int index = 0;
             for (int i = 0; i < cubes.Length; i++)
             {
-                cubeSeqToIndexMap[cubes[i].object_id] = i;  // object_id를 index로 매핑
-                
+                cubeSeqToIndexMap[cubes[i].object_id] = i;
+
                 if (index % batchSize == 0)
                 {
                     matrixBatches.Add(new Matrix4x4[Mathf.Min(batchSize, cubes.Length - index)]);
-                    propertyBatches.Add(new MaterialPropertyBlock[Mathf.Min(batchSize, cubes.Length - index)]);
+                    colorBatches.Add(new Vector4[Mathf.Min(batchSize, cubes.Length - index)]);
                 }
 
                 int x = index % 100;
                 int y = (index / 100) % 100;
                 int z = index / (100 * 100);
-
                 Vector3 pos = new Vector3(x * 1.2f, y * 1.2f, z * 1.2f);
                 matrixBatches[index / batchSize][index % batchSize] = Matrix4x4.TRS(pos, Quaternion.identity, Vector3.one);
 
-                MaterialPropertyBlock props = new MaterialPropertyBlock();
-
-
-                //SET COLOR
-                int nowStatus=cubes[i].now_status;
-                Color colorToUse = Color.gray;
-                if (Var.ColorMap.ContainsKey(nowStatus))
-                {
-                    colorToUse = Var.ColorMap[nowStatus];
-                }
-
-
-                //APPLY COLOR
-                props.SetColor("_BaseColor", colorToUse);
-                propertyBatches[index / batchSize][index % batchSize] = props;
-
-                GameObject colliderCube = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                colliderCube.transform.position = pos;
-                colliderCube.transform.localScale = Vector3.one * 1.2f;
-
-                colliderCube.GetComponent<MeshRenderer>().enabled = false;
-
-
-                //??????????????
-                CubeIndex indx = colliderCube.AddComponent<CubeIndex>();
-                indx.object_id = cubes[i].object_id;
+                int nowStatus = cubes[i].now_status;
+                Color color = Var.ColorMap.ContainsKey(nowStatus) ? Var.ColorMap[nowStatus] : Color.gray;
+                colorBatches[index / batchSize][index % batchSize] = (Vector4)color;
 
                 index++;
             }
         }
     }
 
-
-    
     void Update()
     {
-        MaterialPropertyBlock props = new MaterialPropertyBlock();
-        
-
-        // DrawMesh 그대로 유지
         for (int i = 0; i < matrixBatches.Count; i++)
         {
-            int batchLength = matrixBatches[i].Length;
-            Vector4[] colors = new Vector4[batchLength];
-
-            // 인스턴스 컬러 배열 설정
-            for (int j = 0; j < batchLength; j++)
-            {
-                int nowStatus=cubes[i * batchSize + j].now_status;
-                Color colorToUse = Color.gray;
-                if (Var.ColorMap.ContainsKey(nowStatus))
-                {
-                    colorToUse = Var.ColorMap[nowStatus];
-                }
-
-                colors[j] = colorToUse;
-            }//?????????????????????
-
-            props.Clear();
-            props.SetVectorArray("_BaseColor", colors);
+            MaterialPropertyBlock props = new MaterialPropertyBlock();
+            props.SetVectorArray("_BaseColor", colorBatches[i]);
 
             Graphics.DrawMeshInstanced(
                 cubeMesh,
                 0,
-                baseMaterial,  // 커스텀 셰이더를 사용하는 Material
+                baseMaterial,
                 matrixBatches[i],
-                batchLength,
-                props, // 배열 형태로 한 번에 전달
+                matrixBatches[i].Length,
+                props,
                 UnityEngine.Rendering.ShadowCastingMode.Off,
                 false,
                 0,
@@ -142,25 +93,32 @@ public class CubeLoader : MonoBehaviour
             );
         }
 
-
-        // 마우스 클릭 처리
         if (Input.GetMouseButtonDown(0))
         {
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-
             if (Physics.Raycast(ray, out RaycastHit hit))
             {
                 CubeIndex meta = hit.collider.GetComponent<CubeIndex>();
                 if (meta != null)
                 {
                     string id = meta.object_id;
-                    //Debug.Log($"■ 클릭 큐브 seq: {seq}");
                     StartCoroutine(GetCubeDetail(id));
                 }
             }
         }
     }
 
+    public void UpdateCubeColor(string objectId, int newStatus)
+    {
+        if (!cubeSeqToIndexMap.TryGetValue(objectId, out int index)) return;
+
+        Vector4 newColor = Var.ColorMap.ContainsKey(newStatus) ? (Vector4)Var.ColorMap[newStatus] : (Vector4)Color.gray;
+        int batchIndex = index / batchSize;
+        int inBatchIndex = index % batchSize;
+
+        colorBatches[batchIndex][inBatchIndex] = newColor;
+        cubes[index].now_status = newStatus;
+    }
 
     IEnumerator GetCubeDetail(string id)
     {
@@ -175,11 +133,10 @@ public class CubeLoader : MonoBehaviour
             }
             else
             {
-                Debug.Log($"■ click Cube {id}: " + req.downloadHandler.text);
+                Debug.Log($"\u25A0 click Cube {id}: " + req.downloadHandler.text);
             }
         }
     }
-
 
     Mesh CreateCubeMesh(Vector3 size)
     {
@@ -189,12 +146,9 @@ public class CubeLoader : MonoBehaviour
         return mesh;
     }
 
-
-    //GC handler error 때문에 추가
     void OnDestroy()
     {
         matrixBatches.Clear();
-        propertyBatches.Clear();
+        colorBatches.Clear();
     }
-
-}
+} 
