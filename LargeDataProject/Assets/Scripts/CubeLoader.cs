@@ -44,7 +44,7 @@ public class CubeLoader : MonoBehaviour
         string url = "http://127.0.0.1:8001/api/cubes_custom";
 
         float networkStartTime = Time.realtimeSinceStartup;
-        
+
         UnityWebRequest req = UnityWebRequest.Get(url);
         req.downloadHandler = new DownloadHandlerBuffer();
         yield return req.SendWebRequest();
@@ -61,6 +61,10 @@ public class CubeLoader : MonoBehaviour
         }
 
         Debug.Log("✅ Custom 포맷 수신 성공");
+
+        Debug.Log(req.GetResponseHeader("Content-Encoding"));  //gzip?
+        Debug.Log("응답 길이: " + req.downloadHandler.text.Length); // 실제 텍스트 길이
+
         ParseCustomFormat(req.downloadHandler.text);
     }
 
