@@ -206,13 +206,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0.25846434, y: 0.050552595, z: 0.013545526, w: 0.96460205}
   m_LocalPosition: {x: 34.5, y: 4.5, z: -72.34122}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: -30, y: 6, z: 0}
 --- !u!114 &330585547
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -477,6 +477,8 @@ MonoBehaviour:
   cubeSize: {x: 1, y: 1, z: 1}
   batchSize: 1023
   cubes: []
+  cubes2: []
+  csvUrl: http://localhost:8000/api/cubes_csv
 --- !u!4 &1828728743
 Transform:
   m_ObjectHideFlags: 0

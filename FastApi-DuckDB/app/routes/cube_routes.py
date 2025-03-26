@@ -156,3 +156,24 @@ def get_cubes_csv():
     buffer = io.StringIO()
     df.to_csv(buffer, index=False)
     return Response(content=buffer.getvalue(), media_type="text/csv")
+
+@router.get("/api/cubes_custom")
+def get_cubes_custom():
+    query = f"""
+        SELECT
+            object_id,
+            CASE
+                WHEN DATEDIFF('day', receiving_dt, shipping_dt) <= 5 THEN 1
+                WHEN DATEDIFF('day', receiving_dt, shipping_dt) <= 10 THEN 2
+                ELSE 3
+            END AS now_status,
+            receiving_dt,
+            shipping_dt,
+            remark,
+            cur_qty
+        FROM {TABLE_NAME}
+        LIMIT 50000
+    """
+    df = con.execute(query).fetchdf()
+    lines = df.apply(lambda row: "&".join([str(v) for v in row]), axis=1)
+    return Response("\n".join(lines), media_type="text/plain")
