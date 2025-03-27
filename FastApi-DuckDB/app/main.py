@@ -5,9 +5,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routes import cube_routes
 from fastapi.middleware.gzip import GZipMiddleware#g cip
 
-# Load .env
-from dotenv import load_dotenv
-load_dotenv()
 
 # Create Socket.IO server
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')

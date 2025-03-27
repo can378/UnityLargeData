@@ -1,4 +1,3 @@
-# routes/cube_routes.py
 import os
 import duckdb
 import mysql.connector
@@ -6,18 +5,17 @@ from fastapi import APIRouter, Query, HTTPException, Response
 from app.models.cube import Cube
 from dotenv import load_dotenv
 from socketio import AsyncServer
-import json
-import io
 import pandas as pd
 
+# 환경 변수 불러오기
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASE_DIR, ".env"), override=True)
 
 TABLE_NAME = "TB_WEB_RACK_MST_TEST"
-
 router = APIRouter()
 con = duckdb.connect(database=':memory:')
 
+# load data
 def load_data_from_mariadb():
     conn = mysql.connector.connect(
         host=os.getenv("METANET_DB_HOST"),
@@ -38,28 +36,32 @@ def load_data_from_mariadb():
 
 load_data_from_mariadb()
 
+# socket.io - 사용 시 초기화
 sio: AsyncServer = None
 
 def init_routes(socket_io: AsyncServer):
     global sio
     sio = socket_io
 
+# 공통 SELECT 쿼리 함수
+CUBE_SELECT_QUERY = f"""
+    SELECT
+        object_id,
+        CASE
+            WHEN DATEDIFF('day', receiving_dt, shipping_dt) <= 5 THEN 1
+            WHEN DATEDIFF('day', receiving_dt, shipping_dt) <= 10 THEN 2
+            ELSE 3
+        END AS now_status,
+        receiving_dt,
+        shipping_dt,
+        remark,
+        cur_qty
+    FROM {TABLE_NAME}
+    LIMIT 100000
+"""
+
 def get_cube_with_status(object_id: str):
-    query = f"""
-        SELECT
-            object_id,
-            CASE
-                WHEN DATEDIFF('day', receiving_dt, shipping_dt) <= 5 THEN 1
-                WHEN DATEDIFF('day', receiving_dt, shipping_dt) <= 10 THEN 2
-                ELSE 3
-            END AS now_status,
-            receiving_dt,
-            shipping_dt,
-            remark,
-            cur_qty
-        FROM {TABLE_NAME}
-        WHERE object_id = ?
-    """
+    query = CUBE_SELECT_QUERY + " WHERE object_id = ?"
     result = con.execute(query, (object_id,)).fetchdf()
     if result.empty:
         return None
@@ -70,26 +72,28 @@ def get_cube_with_status(object_id: str):
             cube[key] = cube[key].isoformat()
     return cube
 
+
+
+
+
+
+
+
+
+#get all cubes - csv form
+@router.get("/api/cubes_custom")
+def get_cubes_custom():
+    df = con.execute(CUBE_SELECT_QUERY).fetchdf()
+    lines = df.apply(lambda row: "&".join([str(v) for v in row]), axis=1)
+    return Response("\n".join(lines), media_type="text/plain")
+
+#get all cubes
 @router.get("/api/cubes")
 def get_cubes():
-    query = f"""
-        SELECT
-            object_id,
-            CASE
-                WHEN DATEDIFF('day', receiving_dt, shipping_dt) <= 5 THEN 1
-                WHEN DATEDIFF('day', receiving_dt, shipping_dt) <= 10 THEN 2
-                ELSE 3
-            END AS now_status,
-            receiving_dt,
-            shipping_dt,
-            remark,
-            cur_qty
-        FROM {TABLE_NAME}
-        
-    """
-    result = con.execute(query).fetchdf()
+    result = con.execute(CUBE_SELECT_QUERY).fetchdf()
     return result.to_dict(orient="records")
 
+#get one cube
 @router.get("/api/cube")
 def get_one_cube(object_id: str = Query(...)):
     result = get_cube_with_status(object_id)
@@ -97,6 +101,7 @@ def get_one_cube(object_id: str = Query(...)):
         return {"message": f"Cube {object_id} not found."}
     return result
 
+#insert cube
 @router.post("/api/cube")
 async def create_cube(cube: Cube):
     con.execute(f"""
@@ -109,9 +114,11 @@ async def create_cube(cube: Cube):
     await sio.emit("cube_updated", cube_with_status)
     return {"message": "box created"}
 
+#update cube
 @router.put("/api/cube/{object_id}")
 async def update_cube(object_id: str, cube: Cube):
     result = con.execute(f"SELECT * FROM {TABLE_NAME} WHERE object_id = ?", (object_id,)).fetchdf()
+    
     if result.empty:
         raise HTTPException(status_code=404, detail="Cube not found")
 
@@ -122,12 +129,10 @@ async def update_cube(object_id: str, cube: Cube):
     """, (cube.object_id, cube.receiving_dt, cube.shipping_dt, cube.remark, cube.cur_qty, object_id))
 
     cube_with_status = get_cube_with_status(cube.object_id)
-    # print("cube_with_status type:", type(cube_with_status))
-    # print("update data=" + json.dumps(cube_with_status, indent=2))
-
     await sio.emit("cube_updated", cube_with_status)
     return {"message": "box updated"}
 
+#delete cube
 @router.delete("/api/cube/{object_id}")
 async def delete_cube(object_id: str):
     con.execute(f"DELETE FROM {TABLE_NAME} WHERE object_id = ?", (object_id,))
@@ -135,45 +140,3 @@ async def delete_cube(object_id: str):
     return {"message": "Cube deleted"}
 
 
-
-@router.get("/api/cubes_csv")
-def get_cubes_csv():
-    query = f"""
-        SELECT
-            object_id,
-            CASE
-                WHEN DATEDIFF('day', receiving_dt, shipping_dt) <= 5 THEN 1
-                WHEN DATEDIFF('day', receiving_dt, shipping_dt) <= 10 THEN 2
-                ELSE 3
-            END AS now_status,
-            receiving_dt,
-            shipping_dt,
-            remark,
-            cur_qty
-        FROM {TABLE_NAME}
-    """
-    df = con.execute(query).fetchdf()
-    buffer = io.StringIO()
-    df.to_csv(buffer, index=False)
-    return Response(content=buffer.getvalue(), media_type="text/csv")
-
-@router.get("/api/cubes_custom")
-def get_cubes_custom():
-    query = f"""
-        SELECT
-            object_id,
-            CASE
-                WHEN DATEDIFF('day', receiving_dt, shipping_dt) <= 5 THEN 1
-                WHEN DATEDIFF('day', receiving_dt, shipping_dt) <= 10 THEN 2
-                ELSE 3
-            END AS now_status,
-            receiving_dt,
-            shipping_dt,
-            remark,
-            cur_qty
-        FROM {TABLE_NAME}
-        LIMIT 100000
-    """
-    df = con.execute(query).fetchdf()
-    lines = df.apply(lambda row: "&".join([str(v) for v in row]), axis=1)
-    return Response("\n".join(lines), media_type="text/plain")
