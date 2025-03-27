@@ -3,6 +3,7 @@ using UnityEngine.Networking;
 using System.Collections;
 using System.Collections.Generic;
 using System;
+using Newtonsoft.Json;
 
 public class CubeLoader : MonoBehaviour
 {
@@ -23,6 +24,11 @@ public class CubeLoader : MonoBehaviour
 
     private List<MaterialPropertyBlock> propertyBlocks = new List<MaterialPropertyBlock>();
     
+
+
+    private Dictionary<string, string> cubeDict = new Dictionary<string, string>();
+    //직렬화 결과
+
     void Start()
     {
         baseMaterial.enableInstancing = true;
@@ -67,12 +73,19 @@ public class CubeLoader : MonoBehaviour
     void ParseCustomFormat(string raw)
     {
         string[] lines = raw.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        cubeDict.Clear();
+
         foreach (string line in lines)
         {
-            //&으로 구분
-            string[] fields = line.Split('&');
+            int idx = line.IndexOf('&');
+            if (idx == -1) continue;
 
-            //데이터 변경하게 되면 바꿔야함
+            string key = line.Substring(0, idx);
+            string value = line.Substring(idx + 1);
+
+            cubeDict[key] = value;
+
+            string[] fields = value.Split('&');
             if (fields.Length != 6)
             {
                 Debug.LogWarning("필드 수 불일치: " + line);
@@ -96,6 +109,9 @@ public class CubeLoader : MonoBehaviour
         Debug.Log($"{cubes.Count}개 큐브 로딩 완료");
         StartCoroutine(RenderCubesCoroutine());
     }
+
+
+
 
 
 
@@ -144,6 +160,12 @@ public class CubeLoader : MonoBehaviour
 
         renderReady = true;
 
+
+        //JSON 직렬화!!!!!!!
+        string json = JsonConvert.SerializeObject(cubeDict, Formatting.Indented);
+        Debug.Log("JSON 직렬화 결과:\n" + json);
+
+    
     }
 
 

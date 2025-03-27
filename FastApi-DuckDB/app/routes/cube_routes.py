@@ -59,6 +59,23 @@ CUBE_SELECT_QUERY = f"""
     FROM {TABLE_NAME}
 """
 
+CUBE_SELECT_QUERY2 = f"""
+    SELECT
+        ROW_NUMBER() OVER () AS row_index,
+        object_id,
+        CASE
+            WHEN DATEDIFF('day', receiving_dt, shipping_dt) <= 5 THEN 1
+            WHEN DATEDIFF('day', receiving_dt, shipping_dt) <= 10 THEN 2
+            ELSE 3
+        END AS now_status,
+        receiving_dt,
+        shipping_dt,
+        remark,
+        cur_qty
+    FROM {TABLE_NAME}
+"""
+
+
 CUBE_SELECT_ALL = CUBE_SELECT_QUERY + " LIMIT 100000"
 
 
@@ -85,7 +102,7 @@ def get_cube_with_status(object_id: str):
 #get all cubes - csv form
 @router.get("/api/cubes_custom")
 def get_cubes_custom():
-    df = con.execute(CUBE_SELECT_ALL).fetchdf()
+    df = con.execute(CUBE_SELECT_QUERY2).fetchdf()
     lines = df.apply(lambda row: "&".join([str(v) for v in row]), axis=1)
     return Response("\n".join(lines), media_type="text/plain")
 
