@@ -16,8 +16,7 @@ public class CubeLoader : MonoBehaviour
     public List<Vector4[]> colorBatches = new List<Vector4[]>();
     public int batchSize = 1023;
 
-    public CubeData[] cubes;
-    public List<CubeData> cubes2 = new List<CubeData>();
+    public List<CubeData> cubes = new List<CubeData>();
     private bool renderReady = false;
 
     private float renderStartTime = 0f;
@@ -42,25 +41,25 @@ public class CubeLoader : MonoBehaviour
     {
         float networkStartTime = Time.realtimeSinceStartup;
 
-        UnityWebRequest req = UnityWebRequest.Get(Var.CsvApiUrl);
+        //get data
+        UnityWebRequest req = UnityWebRequest.Get(Var.CustomFormatApiUrl);
         req.downloadHandler = new DownloadHandlerBuffer();
         yield return req.SendWebRequest();
 
 
+        //check time
         float networkEndTime = Time.realtimeSinceStartup;
         float downloadDuration = networkEndTime - networkStartTime;
         Debug.Log($"⌛ 데이터 다운로드: {downloadDuration:F2}초");
-        
+
+
         if (req.result != UnityWebRequest.Result.Success)
         {
-            Debug.LogError("💢 csv 다운로드 실패: " + req.error);
+            Debug.LogError("👹 get data 실패: " + req.error);
             yield break;
         }
 
-        Debug.Log("csv로 수신 성공");
-
-        //Debug.Log(req.GetResponseHeader("Content-Encoding"));  //gzip?
-        //Debug.Log("실제 첵스트 길이: " + req.downloadHandler.text.Length);
+        Debug.Log("csv 수신 성공");
 
         ParseCustomFormat(req.downloadHandler.text);
     }
@@ -70,7 +69,10 @@ public class CubeLoader : MonoBehaviour
         string[] lines = raw.Split('\n', StringSplitOptions.RemoveEmptyEntries);
         foreach (string line in lines)
         {
+            //&으로 구분
             string[] fields = line.Split('&');
+
+            //데이터 변경하게 되면 바꿔야함
             if (fields.Length != 6)
             {
                 Debug.LogWarning("필드 수 불일치: " + line);
@@ -79,7 +81,7 @@ public class CubeLoader : MonoBehaviour
 
             CubeData cube = new CubeData
             {
-                object_id = fields[0].Trim('\"'),
+                object_id = fields[0].Trim('"'),
                 now_status = int.Parse(fields[1]),
                 receiving_dt = fields[2],
                 shipping_dt = fields[3],
@@ -87,60 +89,31 @@ public class CubeLoader : MonoBehaviour
                 cur_qty = float.Parse(fields[5])
             };
 
-            cubes2.Add(cube);
-            cubeSeqToIndexMap[cube.object_id] = cubes2.Count - 1;
+            cubes.Add(cube);
+            cubeSeqToIndexMap[cube.object_id] = cubes.Count - 1;
         }
 
-        Debug.Log($"{cubes2.Count}개 큐브 로딩 완료");
+        Debug.Log($"{cubes.Count}개 큐브 로딩 완료");
         StartCoroutine(RenderCubesCoroutine());
     }
 
 
 
-    void ParseCSV(string csv)
-    {
-        cubeSeqToIndexMap.Clear();
-        cubes2.Clear();
-
-        string[] lines = csv.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
-        string[] headers = lines[0].Split(',');
-
-        for (int i = 1; i < lines.Length; i++)
-        {
-            string[] row = lines[i].Split(',');
-            if (row.Length != headers.Length) continue;
-
-            CubeData cube = new CubeData
-            {
-                object_id = row[0],
-                now_status = int.Parse(row[1]),
-                receiving_dt = row[2],
-                shipping_dt = row[3],
-                remark = row[4],
-                cur_qty = float.Parse(row[5])
-            };
-
-            cubes2.Add(cube);
-            cubeSeqToIndexMap[cube.object_id] = cubes2.Count - 1;
-        }
-
-        Debug.Log($"{cubes2.Count}개 큐브 로딩 완료 (CSV)");
-    }
-
+    //cube들 그리기
     IEnumerator RenderCubesCoroutine()
     {
         matrixBatches.Clear();
         colorBatches.Clear();
         propertyBlocks.Clear();
 
-        for (int index = 0; index < cubes2.Count; index++)
+        for (int index = 0; index < cubes.Count; index++)
         {
-            CubeData cube = cubes2[index];
+            CubeData cube = cubes[index];
 
             if (index % batchSize == 0)
             {
-                matrixBatches.Add(new Matrix4x4[Mathf.Min(batchSize, cubes2.Count - index)]);
-                colorBatches.Add(new Vector4[Mathf.Min(batchSize, cubes2.Count - index)]);
+                matrixBatches.Add(new Matrix4x4[Mathf.Min(batchSize, cubes.Count - index)]);
+                colorBatches.Add(new Vector4[Mathf.Min(batchSize, cubes.Count - index)]);
             }
 
             int x = index % 100;
@@ -157,16 +130,13 @@ public class CubeLoader : MonoBehaviour
                 yield return null;
         }
 
-        // MaterialPropertyBlock 재사용 리스트 생성
-        int batchCount = matrixBatches.Count;
-        for (int i = 0; i < batchCount; i++)
+        // MaterialPropertyBlock
+        for (int i = 0; i < matrixBatches.Count; i++)
         {
             MaterialPropertyBlock props = new MaterialPropertyBlock();
             props.SetVectorArray("_BaseColor", colorBatches[i]);
             propertyBlocks.Add(props);
         }
-
-        cubes = cubes2.ToArray(); // 배열로 복사
 
         // 렌더 준비 시간 측정 종료
         float elapsed = Time.realtimeSinceStartup - renderStartTime;
@@ -183,11 +153,6 @@ public class CubeLoader : MonoBehaviour
 
         for (int i = 0; i < matrixBatches.Count; i++)
         {
-            if (i >= propertyBlocks.Count)
-            {
-                Debug.LogWarning($"propertyBlocks 부족! index={i}, count={propertyBlocks.Count}");
-                continue;
-            }
             Graphics.DrawMeshInstanced(
                 cubeMesh,
                 0,
@@ -197,23 +162,10 @@ public class CubeLoader : MonoBehaviour
                 propertyBlocks[i]
             );
         }
-
-        if (Input.GetMouseButtonDown(0))
-        {
-            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-            if (Physics.Raycast(ray, out RaycastHit hit))
-            {
-                CubeIndex meta = hit.collider.GetComponent<CubeIndex>();
-                if (meta != null)
-                {
-                    string id = meta.object_id;
-                    StartCoroutine(GetCubeDetail(id));
-                }
-            }
-        }
     }
 
 
+    //update한거 받아왔을 때 색 변경하는 것. 안쓰면 지워도됨.
     public void UpdateCubeColor(string objectId, int newStatus)
     {
         if (!cubeSeqToIndexMap.TryGetValue(objectId, out int index)) return;
@@ -226,23 +178,6 @@ public class CubeLoader : MonoBehaviour
         cubes[index].now_status = newStatus;
     }
 
-    IEnumerator GetCubeDetail(string id)
-    {
-        string url = Var.CubeDetailUrl(id);
-        using (UnityWebRequest req = UnityWebRequest.Get(url))
-        {
-            yield return req.SendWebRequest();
-
-            if (req.result != UnityWebRequest.Result.Success)
-            {
-                Debug.LogError("API 요청 실패: " + req.error);
-            }
-            else
-            {
-                Debug.Log($"■ click Cube {id}: " + req.downloadHandler.text);
-            }
-        }
-    }
 
     Mesh CreateCubeMesh(Vector3 size)
     {

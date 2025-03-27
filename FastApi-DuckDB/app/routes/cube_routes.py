@@ -57,8 +57,10 @@ CUBE_SELECT_QUERY = f"""
         remark,
         cur_qty
     FROM {TABLE_NAME}
-    LIMIT 100000
 """
+
+CUBE_SELECT_ALL = CUBE_SELECT_QUERY + " LIMIT 100000"
+
 
 def get_cube_with_status(object_id: str):
     query = CUBE_SELECT_QUERY + " WHERE object_id = ?"
@@ -83,14 +85,14 @@ def get_cube_with_status(object_id: str):
 #get all cubes - csv form
 @router.get("/api/cubes_custom")
 def get_cubes_custom():
-    df = con.execute(CUBE_SELECT_QUERY).fetchdf()
+    df = con.execute(CUBE_SELECT_ALL).fetchdf()
     lines = df.apply(lambda row: "&".join([str(v) for v in row]), axis=1)
     return Response("\n".join(lines), media_type="text/plain")
 
 #get all cubes
 @router.get("/api/cubes")
 def get_cubes():
-    result = con.execute(CUBE_SELECT_QUERY).fetchdf()
+    result = con.execute(CUBE_SELECT_ALL).fetchdf()
     return result.to_dict(orient="records")
 
 #get one cube
@@ -112,7 +114,7 @@ async def create_cube(cube: Cube):
 
     cube_with_status = get_cube_with_status(cube.object_id)
     await sio.emit("cube_updated", cube_with_status)
-    return {"message": "box created"}
+    return {"message": "object created"}
 
 #update cube
 @router.put("/api/cube/{object_id}")
@@ -130,13 +132,13 @@ async def update_cube(object_id: str, cube: Cube):
 
     cube_with_status = get_cube_with_status(cube.object_id)
     await sio.emit("cube_updated", cube_with_status)
-    return {"message": "box updated"}
+    return {"message": "object updated"}
 
 #delete cube
 @router.delete("/api/cube/{object_id}")
 async def delete_cube(object_id: str):
     con.execute(f"DELETE FROM {TABLE_NAME} WHERE object_id = ?", (object_id,))
     await sio.emit("cube_deleted", {"object_id": object_id})
-    return {"message": "Cube deleted"}
+    return {"message": "object deleted"}
 
 

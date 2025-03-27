@@ -24,7 +24,7 @@ public class SocketManager : MonoBehaviour
 
         client.On("cube_updated", response =>
         {
-            Debug.Log("📦 Raw JSON from server: " + response.ToString());
+            Debug.Log("💩 Raw JSON: " + response.ToString());
 
             try
             {
@@ -40,7 +40,7 @@ public class SocketManager : MonoBehaviour
             }
             catch (Exception ex)
             {
-                Debug.LogError("❌ JSON 파싱 실패: " + ex.Message);
+                Debug.LogError("JSON 파싱 실패: " + ex.Message);
             }
         });
 
@@ -64,11 +64,11 @@ public class SocketManager : MonoBehaviour
             // 색상 업데이트
             cubeLoader.UpdateCubeColor(updatedCube.object_id, updatedCube.now_status);
 
-            Debug.Log($"🎨 Cube {updatedCube.object_id} 색상 갱신 완료");
+            Debug.Log($"Cube {updatedCube.object_id} 색상 갱신 완료");
         }
         else
         {
-            Debug.LogWarning($"⚠️ Cube ID {updatedCube.object_id} 없음");
+            Debug.LogWarning($"Cube {updatedCube.object_id} 없음");
         }
     }
 }
