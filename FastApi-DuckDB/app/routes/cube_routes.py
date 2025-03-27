@@ -89,7 +89,7 @@ async def update_cube(object_id: str, cube: Cube):
     result = con.execute(f"SELECT * FROM {TABLE_NAME} WHERE object_id = ?", (object_id,)).fetchdf()
     
     if result.empty:
-        raise HTTPException(status_code=404, detail="Cube not found")
+        raise HTTPException(status_code=404, detail="Object not found")
 
     con.execute(f"""
         UPDATE {TABLE_NAME} 
@@ -104,8 +104,13 @@ async def update_cube(object_id: str, cube: Cube):
 #delete cube
 @router.delete("/api/cube/{object_id}")
 async def delete_cube(object_id: str):
+    result = con.execute(f"SELECT * FROM {TABLE_NAME} WHERE object_id = ?", (object_id,)).fetchone()
+    
+    if result is None:
+        raise HTTPException(status_code=404, detail="object not found")
+    
     con.execute(f"DELETE FROM {TABLE_NAME} WHERE object_id = ?", (object_id,))
     
     return {"message": "object deleted"}
 
-
+ 
