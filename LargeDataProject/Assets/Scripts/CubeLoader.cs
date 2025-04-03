@@ -36,7 +36,7 @@ public class CubeLoader : MonoBehaviour
         float networkEndTime = Time.realtimeSinceStartup;
         float downloadDuration = networkEndTime - networkStartTime;
         Debug.Log($"⌛ 데이터 다운로드: {downloadDuration:F2}초");
-
+        //Debug.Log($"데이터 개수: {req.downloadHandler.text.Split('\n').Length}개");
         ParseCustomFormat(req.downloadHandler.text);
     }
 
