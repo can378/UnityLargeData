@@ -1,5 +1,4 @@
 import os
-import duckdb
 import mysql.connector
 from fastapi import APIRouter, Query, HTTPException, Response
 from app.models.cube import Cube
@@ -12,39 +11,24 @@ load_dotenv(os.path.join(BASE_DIR, ".env"), override=True)
 
 TABLE_NAME = "TB_WEB_RACK_MST_TEST"
 router = APIRouter()
-con = duckdb.connect(database=':memory:')
 
-# load data
-def load_data_from_mariadb():
-    conn = mysql.connector.connect(
+# MariaDB 연결 함수
+def get_mariadb_conn():
+    return mysql.connector.connect(
         host=os.getenv("METANET_DB_HOST"),
         port=int(os.getenv("METANET_DB_PORT")),
         user=os.getenv("METANET_DB_USERNAME"),
         password=os.getenv("METANET_DB_PSW"),
         database=os.getenv("METANET_DB_NAME")
     )
-
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute(f"SELECT * FROM {TABLE_NAME}")
-    rows = cursor.fetchall()
-    df_table = pd.DataFrame(rows)
-    con.execute(f"CREATE OR REPLACE TABLE {TABLE_NAME} AS SELECT * FROM df_table")
-
-    cursor.close()
-    conn.close()
-
-load_data_from_mariadb()
-
-
-
-
+ 
 CUBE_SELECT_QUERY = f"""
     SELECT
         ROW_NUMBER() OVER () AS row_index,
         object_id,
         CASE
-            WHEN DATEDIFF('day', receiving_dt, shipping_dt) <= 5 THEN 1
-            WHEN DATEDIFF('day', receiving_dt, shipping_dt) <= 10 THEN 2
+            WHEN DATEDIFF(receiving_dt, shipping_dt) <= 5 THEN 1
+            WHEN DATEDIFF(receiving_dt, shipping_dt) <= 10 THEN 2
             ELSE 3
         END AS now_status,
         receiving_dt,
@@ -54,63 +38,68 @@ CUBE_SELECT_QUERY = f"""
     FROM {TABLE_NAME}
 """
 
-
-
-
-
-
-
-
-
-#get all cubes - text form
+# get all cubes - text form
 @router.get("/api/cubes_custom")
 def get_cubes_custom():
-    df = con.execute(CUBE_SELECT_QUERY).fetchdf()
+    conn = get_mariadb_conn()
+    df = pd.read_sql(CUBE_SELECT_QUERY, conn)
+    conn.close()
     lines = df.apply(lambda row: "&".join([str(v) for v in row]), axis=1)
     return Response("\n".join(lines), media_type="text/plain")
 
-
-#insert cube
+# insert cube
 @router.post("/api/cube")
 async def create_cube(cube: Cube):
-    con.execute(f"""
+    conn = get_mariadb_conn()
+    cursor = conn.cursor()
+    cursor.execute(f"""
         INSERT INTO {TABLE_NAME} 
         (object_id, receiving_dt, shipping_dt, remark, cur_qty) 
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s)
     """, (cube.object_id, cube.receiving_dt, cube.shipping_dt, cube.remark, cube.cur_qty))
-
-    # cube_with_status = get_cube_with_status(cube.object_id)
-    
+    conn.commit()
+    cursor.close()
+    conn.close()
     return {"message": "object created"}
 
-#update cube
+# update cube
 @router.put("/api/cube/{object_id}")
 async def update_cube(object_id: str, cube: Cube):
-    result = con.execute(f"SELECT * FROM {TABLE_NAME} WHERE object_id = ?", (object_id,)).fetchdf()
-    
-    if result.empty:
+    conn = get_mariadb_conn()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute(f"SELECT * FROM {TABLE_NAME} WHERE object_id = %s", (object_id,))
+    result = cursor.fetchone()
+
+    if result is None:
+        cursor.close()
+        conn.close()
         raise HTTPException(status_code=404, detail="Object not found")
 
-    con.execute(f"""
+    cursor.execute(f"""
         UPDATE {TABLE_NAME} 
-        SET object_id=?, receiving_dt=?, shipping_dt=?, remark=?, cur_qty=? 
-        WHERE object_id=?
+        SET object_id=%s, receiving_dt=%s, shipping_dt=%s, remark=%s, cur_qty=%s 
+        WHERE object_id=%s
     """, (cube.object_id, cube.receiving_dt, cube.shipping_dt, cube.remark, cube.cur_qty, object_id))
-
-    # cube_with_status = get_cube_with_status(cube.object_id)
-    
+    conn.commit()
+    cursor.close()
+    conn.close()
     return {"message": "object updated"}
 
-#delete cube
+# delete cube
 @router.delete("/api/cube/{object_id}")
 async def delete_cube(object_id: str):
-    result = con.execute(f"SELECT * FROM {TABLE_NAME} WHERE object_id = ?", (object_id,)).fetchone()
-    
-    if result is None:
-        raise HTTPException(status_code=404, detail="object not found")
-    
-    con.execute(f"DELETE FROM {TABLE_NAME} WHERE object_id = ?", (object_id,))
-    
-    return {"message": "object deleted"}
+    conn = get_mariadb_conn()
+    cursor = conn.cursor()
+    cursor.execute(f"SELECT * FROM {TABLE_NAME} WHERE object_id = %s", (object_id,))
+    result = cursor.fetchone()
 
- 
+    if result is None:
+        cursor.close()
+        conn.close()
+        raise HTTPException(status_code=404, detail="object not found")
+
+    cursor.execute(f"DELETE FROM {TABLE_NAME} WHERE object_id = %s", (object_id,))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return {"message": "object deleted"}
