@@ -1,8 +1,11 @@
 # 🎮 Unity Large-Scale Data Transmission Project  
 ### *(Unity + FastAPI + DuckDB)*
 
-Unity 기반의 **대용량 데이터 전송 및 3D 시각화 프로젝트**  
-FastAPI와 DuckDB를 활용해 **최대 100,000개 이상의 데이터를 초고속 처리**  
+Unity 기반의 **대용량 데이터 전송 및 3D 시각화 프로젝트**
+
+FastAPI와 DuckDB 메모리 매핑을 활용해 **최대 100,000개 이상의 데이터를 초고속 처리**
+
+기존 15초 이상 걸리던 방식 대비 **2~3초로 속도 개선**
 
 ---
 
